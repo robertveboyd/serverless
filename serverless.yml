@@ -1,0 +1,285 @@
+service: snes-store-demo
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: us-east-1
+
+  environment:
+    PRODUCT_TABLE: ${self:custom.ENV_PRODUCT_TABLE}
+    PRODUCT_PARTITION_KEY: ${self:custom.ENV_PRODUCT_PARTITION_KEY}
+    CART_TABLE: ${self:custom.ENV_CART_TABLE}
+    CART_PARTITION_KEY: ${self:custom.ENV_CART_PARTITION_KEY}
+    CART_SORT_KEY: ${self:custom.ENV_CART_SORT_KEY}
+    ORDER_TABLE: ${self:custom.ENV_ORDER_TABLE}
+    ORDER_PARTITION_KEY: ${self:custom.ENV_ORDER_PARTITION_KEY}
+    ORDER_SORT_KEY: ${self:custom.ENV_ORDER_SORT_KEY}
+    COGNITO_USER_POOL: ${self:custom.ENV_COGNITO_USER_POOL}
+    COGNITO_USER_POOL_CLIENT: ${self:custom.ENV_COGNITO_USER_POOL_CLIENT}
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Scan
+        - dynamodb:Query
+        - dynamodb:GetItem
+      Resource:
+        - !GetAtt ProductTable.Arn
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - !GetAtt CartTable.Arn
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - !GetAtt OrderTable.Arn
+    - Effect: Allow
+      Action:
+        - cognito-idp:AdminInitiateAuth
+        - cognito-idp:AdminCreateUser
+        - cognito-idp:AdminSetUserPassword
+      Resource: "*"
+
+functions:
+  signupFunction:
+    handler: src/handlers/signup/index.handler
+    events:
+      - http:
+          path: signup
+          method: post
+          cors: true
+
+  loginFunction:
+    handler: src/handlers/login/index.handler
+    events:
+      - http:
+          path: login
+          method: post
+          cors: true
+
+  getProductsFunction:
+    handler: src/handlers/getProducts/index.handler
+    events:
+      - http:
+          path: products
+          method: get
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - CognitoUserPool
+                - Arn
+            claims:
+              - email
+
+  getCartFunction:
+    handler: src/handlers/getCart/index.handler
+    events:
+      - http:
+          path: cart
+          method: get
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - CognitoUserPool
+                - Arn
+            claims:
+              - email
+
+  createCartItemFunction:
+    handler: src/handlers/createCartItem/index.handler
+    events:
+      - http:
+          path: cart/item
+          method: post
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - CognitoUserPool
+                - Arn
+            claims:
+              - email
+
+  deleteCartItemFunction:
+    handler: src/handlers/deleteCartItem/index.handler
+    events:
+      - http:
+          path: cart/item/{productName}
+          method: delete
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - CognitoUserPool
+                - Arn
+            claims:
+              - email
+
+  deleteCartFunction:
+    handler: src/handlers/deleteCart/index.handler
+    events:
+      - http:
+          path: cart
+          method: delete
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - CognitoUserPool
+                - Arn
+            claims:
+              - email
+
+  getOrdersFunction:
+    handler: src/handlers/getOrders/index.handler
+    events:
+      - http:
+          path: orders
+          method: get
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - CognitoUserPool
+                - Arn
+            claims:
+              - email
+
+  createOrderFunction:
+    handler: src/handlers/createOrder/index.handler
+    events:
+      - http:
+          path: order
+          method: post
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - CognitoUserPool
+                - Arn
+            claims:
+              - email
+
+resources:
+  Resources:
+    ProductTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: "Product"
+        AttributeDefinitions:
+          - AttributeName: "${self:custom.ENV_PRODUCT_PARTITION_KEY}"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "${self:custom.ENV_PRODUCT_PARTITION_KEY}"
+            KeyType: "HASH"
+        BillingMode: PAY_PER_REQUEST
+
+    CartTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: "Cart"
+        AttributeDefinitions:
+          - AttributeName: "${self:custom.ENV_CART_PARTITION_KEY}"
+            AttributeType: "S"
+          - AttributeName: "${self:custom.ENV_CART_SORT_KEY}"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "${self:custom.ENV_CART_PARTITION_KEY}"
+            KeyType: "HASH"
+          - AttributeName: "${self:custom.ENV_CART_SORT_KEY}"
+            KeyType: "RANGE"
+        BillingMode: PAY_PER_REQUEST
+
+    OrderTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: "Order"
+        AttributeDefinitions:
+          - AttributeName: "CustomerId"
+            AttributeType: "S"
+          - AttributeName: "OrderDate"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "CustomerId"
+            KeyType: "HASH"
+          - AttributeName: "OrderDate"
+            KeyType: "RANGE"
+        BillingMode: PAY_PER_REQUEST
+
+    CognitoUserPool:
+      Type: "AWS::Cognito::UserPool"
+      Properties:
+        UserPoolName: "snes-store-user-pool"
+        Schema:
+          - Name: email
+            Required: true
+            Mutable: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 6
+        AutoVerifiedAttributes: ["email"]
+
+    CognitoUserPoolClient:
+      Type: "AWS::Cognito::UserPoolClient"
+      Properties:
+        ClientName: "snes-store-user-pool-client"
+        GenerateSecret: false
+        UserPoolId:
+          Ref: CognitoUserPool
+        AccessTokenValidity: 5
+        IdTokenValidity: 5
+        ExplicitAuthFlows:
+          - "ADMIN_NO_SRP_AUTH"
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-dynamodb
+  - serverless-offline
+
+custom:
+  ENV_PRODUCT_TABLE: !Ref ProductTable
+  ENV_PRODUCT_PARTITION_KEY: Name
+  ENV_CART_TABLE: !Ref CartTable
+  ENV_CART_PARTITION_KEY: CustomerId
+  ENV_CART_SORT_KEY: ProductName
+  ENV_ORDER_TABLE: !Ref OrderTable
+  ENV_ORDER_PARTITION_KEY: CustomerId
+  ENV_ORDER_SORT_KEY: OrderDate
+  ENV_COGNITO_USER_POOL: !Ref CognitoUserPool
+  ENV_COGNITO_USER_POOL_CLIENT: !Ref CognitoUserPoolClient
+  serverless-dynamodb:
+    port: 8000
+    docker: false
+    stages:
+      - test
+    start:
+      inMemory: true
+      migrate: true

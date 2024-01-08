@@ -1,0 +1,12 @@
+[
+  {
+    "CustomerId": "ABC-123",
+    "OrderDate": "2023-12-20T14:17:13.111Z",
+    "Products": [{ "ProductName": "Product3" }, { "ProductName": "Product4" }]
+  },
+  {
+    "CustomerId": "ABC-123",
+    "OrderDate": "2023-12-20T14:18:13.111Z",
+    "Products": [{ "ProductName": "Product5" }]
+  }
+]
